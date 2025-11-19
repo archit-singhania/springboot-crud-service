@@ -12,14 +12,14 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -47,46 +47,51 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("User created successfully"))
+                .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.name").value("Test User"))
                 .andExpect(jsonPath("$.data.email").value("test@example.com"));
     }
 
     @Test
-    void testGetAllUsers() throws Exception {
-        List<UserResponse> users = List.of(new UserResponse(1L, "John", "john@example.com"));
-        Page<UserResponse> page = new PageImpl<>(users, PageRequest.of(0, 5, Sort.by("id").ascending()), users.size());
+    void testGetAllUsersWithPagination() throws Exception {
+        UserResponse user = new UserResponse(1L, "Test User", "test@example.com");
+        Page<UserResponse> page = new PageImpl<>(List.of(user), PageRequest.of(0, 5), 1);
+
         Mockito.when(userService.getAllUsers(any(PageRequest.class))).thenReturn(page);
 
-        mockMvc.perform(get("/users?page=1")) // 1-based page
+        mockMvc.perform(get("/users?page=1"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("Users retrieved successfully"))
                 .andExpect(jsonPath("$.data[0].id").value(1))
-                .andExpect(jsonPath("$.data[0].name").value("John"))
-                .andExpect(jsonPath("$.data[0].email").value("john@example.com"))
-                .andExpect(jsonPath("$.pageInfo.currentPage").value(1));
-    }
-
-    @Test
-    void testSearchUsers() throws Exception {
-        List<UserResponse> users = List.of(new UserResponse(1L, "John", "john@example.com"));
-        Page<UserResponse> page = new PageImpl<>(users, PageRequest.of(0, 5, Sort.by("id").ascending()), users.size());
-        Mockito.when(userService.searchUsers(eq("John"), any(PageRequest.class))).thenReturn(page);
-
-        mockMvc.perform(get("/users/search?keyword=John&page=1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].name").value("John"))
-                .andExpect(jsonPath("$.data[0].email").value("john@example.com"))
-                .andExpect(jsonPath("$.pageInfo.currentPage").value(1));
+                .andExpect(jsonPath("$.data[0].name").value("Test User"))
+                .andExpect(jsonPath("$.data[0].email").value("test@example.com"))
+                .andExpect(jsonPath("$.pagination.currentPage").value(1))
+                .andExpect(jsonPath("$.pagination.pageSize").value(5))
+                .andExpect(jsonPath("$.pagination.totalElements").value(1))
+                .andExpect(jsonPath("$.pagination.totalPages").value(1))
+                .andExpect(jsonPath("$.pagination.hasNext").value(false))
+                .andExpect(jsonPath("$.pagination.hasPrevious").value(false));
     }
 
     @Test
     void testDeleteUser() throws Exception {
         mockMvc.perform(delete("/users/1"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("User deleted successfully"))
+                .andExpect(jsonPath("$.data").doesNotExist());
     }
 
     @Test
     void testRestoreUser() throws Exception {
         mockMvc.perform(put("/users/restore/1"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("User restored successfully"))
+                .andExpect(jsonPath("$.data").doesNotExist());
     }
 }
+

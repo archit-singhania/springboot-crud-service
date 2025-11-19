@@ -68,7 +68,12 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + id));
-        user.setDeleted(true);
+
+        if (user.isDeleted()) {
+            throw new NotFoundException("User already deleted with id: " + id);
+        }
+
+        user.setDeleted(true); // soft delete
         userRepository.save(user);
     }
 

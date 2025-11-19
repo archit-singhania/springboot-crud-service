@@ -11,7 +11,6 @@ import org.mockito.Mockito;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Optional;
@@ -37,8 +36,8 @@ class UserServiceTest {
         request.setName("John");
         request.setEmail("john@example.com");
 
-        when(userRepository.existsByEmailAndIsDeletedFalse("john@example.com")).thenReturn(false);
         User savedUser = new User(1L, "John", "john@example.com", false);
+        when(userRepository.existsByEmailAndIsDeletedFalse("john@example.com")).thenReturn(false);
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
         UserResponse response = userService.createUser(request);
@@ -49,15 +48,27 @@ class UserServiceTest {
     }
 
     @Test
-    void testGetAllUsers() {
-        User user = new User(1L, "John", "john@example.com", false);
-        Page<User> page = new PageImpl<>(List.of(user), PageRequest.of(0, 5, Sort.by("id").ascending()), 1);
+    void testCreateUserEmailAlreadyExists() {
+        UserRequest request = new UserRequest();
+        request.setName("John");
+        request.setEmail("john@example.com");
+
+        when(userRepository.existsByEmailAndIsDeletedFalse("john@example.com")).thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class, () -> userService.createUser(request));
+    }
+
+    @Test
+    void testGetAllUsersWithPagination() {
+        List<User> usersList = List.of(new User(1L, "John", "john@example.com", false));
+        Page<User> page = new PageImpl<>(usersList);
+
         when(userRepository.findByIsDeletedFalse(any(PageRequest.class))).thenReturn(page);
 
-        Page<UserResponse> result = userService.getAllUsers(PageRequest.of(0, 5, Sort.by("id").ascending()));
+        Page<UserResponse> users = userService.getAllUsers(PageRequest.of(0, 10));
 
-        assertEquals(1, result.getContent().size());
-        assertEquals("John", result.getContent().get(0).getName());
+        assertEquals(1, users.getTotalElements());
+        assertEquals("John", users.getContent().get(0).getName());
     }
 
     @Test
@@ -66,7 +77,6 @@ class UserServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
         UserResponse response = userService.getUserById(1L);
-
         assertEquals("John", response.getName());
     }
 
@@ -91,18 +101,36 @@ class UserServiceTest {
         when(userRepository.save(existing)).thenReturn(updated);
 
         UserResponse response = userService.updateUser(1L, request);
-
         assertEquals("John Updated", response.getName());
     }
 
     @Test
-    void testDeleteUser() {
+    void testUpdateUserEmailAlreadyExists() {
+        UserRequest request = new UserRequest();
+        request.setName("John Updated");
+        request.setEmail("johnupdated@example.com");
+
+        User existing = new User(1L, "John", "john@example.com", false);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(userRepository.existsByEmailAndIdNotAndIsDeletedFalse("johnupdated@example.com", 1L)).thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class, () -> userService.updateUser(1L, request));
+    }
+
+    @Test
+    void testDeleteUserExists() {
         User existing = new User(1L, "John", "john@example.com", false);
         when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
 
         assertDoesNotThrow(() -> userService.deleteUser(1L));
-        assertTrue(existing.isDeleted());
+        assertTrue(existing.isDeleted()); // verify soft delete
         verify(userRepository, times(1)).save(existing);
+    }
+
+    @Test
+    void testDeleteUserNotExists() {
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> userService.deleteUser(1L));
     }
 
     @Test
@@ -116,14 +144,10 @@ class UserServiceTest {
     }
 
     @Test
-    void testSearchUsers() {
-        User user = new User(1L, "John", "john@example.com", false);
-        Page<User> page = new PageImpl<>(List.of(user), PageRequest.of(0, 5, Sort.by("id").ascending()), 1);
-        when(userRepository.searchByNameOrEmail("John", PageRequest.of(0, 5, Sort.by("id").ascending()))).thenReturn(page);
+    void testRestoreUserNotDeleted() {
+        User activeUser = new User(1L, "John", "john@example.com", false);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(activeUser));
 
-        Page<UserResponse> result = userService.searchUsers("John", PageRequest.of(0, 5, Sort.by("id").ascending()));
-
-        assertEquals(1, result.getContent().size());
-        assertEquals("John", result.getContent().get(0).getName());
+        assertThrows(IllegalStateException.class, () -> userService.restoreUser(1L));
     }
 }

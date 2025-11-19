@@ -1,5 +1,7 @@
 package com.example.demo.controller;
 
+import com.example.demo.exception.NotFoundException;
+
 import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.PageInfo;
 import com.example.demo.dto.UserRequest;
@@ -36,7 +38,8 @@ public class UserController {
         ApiResponse<UserResponse> apiResponse = new ApiResponse<>(
                 "success",
                 "User created successfully",
-                response
+                response,
+                HttpStatus.CREATED.value()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(apiResponse);
     }
@@ -61,7 +64,8 @@ public class UserController {
                 "success",
                 "Users retrieved successfully",
                 userPage.getContent(),
-                pageInfo
+                pageInfo,
+                HttpStatus.OK.value()
         );
         return ResponseEntity.ok(apiResponse);
     }
@@ -87,7 +91,8 @@ public class UserController {
                 "success",
                 "Search results retrieved successfully",
                 userPage.getContent(),
-                pageInfo
+                pageInfo,
+                HttpStatus.OK.value()
         );
         return ResponseEntity.ok(apiResponse);
     }
@@ -98,7 +103,8 @@ public class UserController {
         ApiResponse<UserResponse> apiResponse = new ApiResponse<>(
                 "success",
                 "User retrieved successfully",
-                user
+                user,
+                HttpStatus.OK.value()
         );
         return ResponseEntity.ok(apiResponse);
     }
@@ -112,20 +118,32 @@ public class UserController {
         ApiResponse<UserResponse> apiResponse = new ApiResponse<>(
                 "success",
                 "User updated successfully",
-                updated
+                updated,
+                HttpStatus.OK.value()
         );
         return ResponseEntity.ok(apiResponse);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable Long id) {
-        userService.deleteUser(id);
-        ApiResponse<String> apiResponse = new ApiResponse<>(
-                "success",
-                "User deleted successfully",
-                null
-        );
-        return ResponseEntity.ok(apiResponse);
+        try {
+            userService.deleteUser(id);
+            ApiResponse<String> apiResponse = new ApiResponse<>(
+                    "success",
+                    "User deleted successfully",
+                    null,
+                    HttpStatus.OK.value()
+            );
+            return ResponseEntity.ok(apiResponse);
+        } catch (NotFoundException ex) {
+            ApiResponse<String> apiResponse = new ApiResponse<>(
+                    "error",
+                    "User not found or already deleted",
+                    null,
+                    HttpStatus.NOT_FOUND.value()
+            );
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(apiResponse);
+        }
     }
 
     @PutMapping("/restore/{id}")
@@ -134,7 +152,8 @@ public class UserController {
         ApiResponse<String> apiResponse = new ApiResponse<>(
                 "success",
                 "User restored successfully",
-                null
+                null,
+                HttpStatus.OK.value()
         );
         return ResponseEntity.ok(apiResponse);
     }
