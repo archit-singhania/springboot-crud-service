@@ -9,12 +9,17 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -27,7 +32,7 @@ public class UserControllerTest {
     @MockBean
     private UserService userService;
 
-    private ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
     void testCreateUser() throws Exception {
@@ -42,24 +47,35 @@ public class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.name").value("Test User"))
-                .andExpect(jsonPath("$.email").value("test@example.com"));
+                .andExpect(jsonPath("$.data.name").value("Test User"))
+                .andExpect(jsonPath("$.data.email").value("test@example.com"));
     }
 
     @Test
-    void testGetAllUsersWithPagination() throws Exception {
-        List<UserResponse> users = List.of(
-                new UserResponse(1L, "Test User", "test@example.com")
-        );
+    void testGetAllUsers() throws Exception {
+        List<UserResponse> users = List.of(new UserResponse(1L, "John", "john@example.com"));
+        Page<UserResponse> page = new PageImpl<>(users, PageRequest.of(0, 5, Sort.by("id").ascending()), users.size());
+        Mockito.when(userService.getAllUsers(any(PageRequest.class))).thenReturn(page);
 
-        // Mocking service to accept Pageable
-        Mockito.when(userService.getAllUsers(any())).thenReturn(users);
-
-        mockMvc.perform(get("/users?page=0&size=10"))
+        mockMvc.perform(get("/users?page=1")) // 1-based page
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].name").value("Test User"))
-                .andExpect(jsonPath("$[0].email").value("test@example.com"));
+                .andExpect(jsonPath("$.data[0].id").value(1))
+                .andExpect(jsonPath("$.data[0].name").value("John"))
+                .andExpect(jsonPath("$.data[0].email").value("john@example.com"))
+                .andExpect(jsonPath("$.pageInfo.currentPage").value(1));
+    }
+
+    @Test
+    void testSearchUsers() throws Exception {
+        List<UserResponse> users = List.of(new UserResponse(1L, "John", "john@example.com"));
+        Page<UserResponse> page = new PageImpl<>(users, PageRequest.of(0, 5, Sort.by("id").ascending()), users.size());
+        Mockito.when(userService.searchUsers(eq("John"), any(PageRequest.class))).thenReturn(page);
+
+        mockMvc.perform(get("/users/search?keyword=John&page=1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].name").value("John"))
+                .andExpect(jsonPath("$.data[0].email").value("john@example.com"))
+                .andExpect(jsonPath("$.pageInfo.currentPage").value(1));
     }
 
     @Test

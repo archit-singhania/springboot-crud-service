@@ -10,8 +10,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 @Service
 public class UserServiceImpl implements UserService {
 
@@ -24,7 +22,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse createUser(UserRequest request) {
-
         if (userRepository.existsByEmailAndIsDeletedFalse(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists. Please use another email.");
         }
@@ -34,18 +31,13 @@ public class UserServiceImpl implements UserService {
         user.setEmail(request.getEmail());
 
         User saved = userRepository.save(user);
-
         return new UserResponse(saved.getId(), saved.getName(), saved.getEmail());
     }
 
     @Override
-    public List<UserResponse> getAllUsers(Pageable pageable) {
+    public Page<UserResponse> getAllUsers(Pageable pageable) {
         Page<User> page = userRepository.findByIsDeletedFalse(pageable);
-
-        return page.getContent()
-                .stream()
-                .map(u -> new UserResponse(u.getId(), u.getName(), u.getEmail()))
-                .toList();
+        return page.map(u -> new UserResponse(u.getId(), u.getName(), u.getEmail()));
     }
 
     @Override
@@ -53,7 +45,6 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .filter(u -> !u.isDeleted())
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + id));
-
         return new UserResponse(user.getId(), user.getName(), user.getEmail());
     }
 
@@ -70,7 +61,6 @@ public class UserServiceImpl implements UserService {
         user.setEmail(request.getEmail());
 
         User saved = userRepository.save(user);
-
         return new UserResponse(saved.getId(), saved.getName(), saved.getEmail());
     }
 
@@ -78,7 +68,6 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + id));
-
         user.setDeleted(true);
         userRepository.save(user);
     }
@@ -97,12 +86,8 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<UserResponse> searchUsers(String keyword, Pageable pageable) {
+    public Page<UserResponse> searchUsers(String keyword, Pageable pageable) {
         Page<User> page = userRepository.searchByNameOrEmail(keyword, pageable);
-
-        return page.getContent()
-                .stream()
-                .map(u -> new UserResponse(u.getId(), u.getName(), u.getEmail()))
-                .toList();
+        return page.map(u -> new UserResponse(u.getId(), u.getName(), u.getEmail()));
     }
 }
