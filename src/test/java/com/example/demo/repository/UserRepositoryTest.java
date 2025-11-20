@@ -18,13 +18,18 @@ class UserRepositoryTest {
     @Autowired
     private UserRepository userRepository;
 
+    // Helper method to create a user with password
+    private User createUser(String name, String email, String password) {
+        User user = new User();
+        user.setName(name);
+        user.setEmail(email);
+        user.setPassword(password);
+        return userRepository.save(user);
+    }
+
     @Test
     void testSaveAndFindUser() {
-        User user = new User();
-        user.setName("John Doe");
-        user.setEmail("john@test.com");
-
-        User saved = userRepository.save(user);
+        User saved = createUser("John Doe", "john@test.com", "secret123");
 
         assertNotNull(saved.getId());
 
@@ -34,15 +39,12 @@ class UserRepositoryTest {
         User u = found.get();
         assertEquals("John Doe", u.getName());
         assertEquals("john@test.com", u.getEmail());
+        assertEquals("secret123", u.getPassword());
     }
 
     @Test
     void testDeleteUser() {
-        User user = new User();
-        user.setName("Jane Doe");
-        user.setEmail("jane@test.com");
-
-        User saved = userRepository.save(user);
+        User saved = createUser("Jane Doe", "jane@test.com", "pass123");
 
         userRepository.deleteById(saved.getId());
 
@@ -52,21 +54,9 @@ class UserRepositoryTest {
 
     @Test
     void testFindAllUsers() {
-        User user1 = new User();
-        user1.setName("ABC");
-        user1.setEmail("abc@test.com");
-
-        User user2 = new User();
-        user2.setName("XYZ");
-        user2.setEmail("xyz@test.com");
-
-        User user3 = new User();
-        user3.setName("DEF");
-        user3.setEmail("def@test.com");
-
-        userRepository.save(user1);
-        userRepository.save(user2);
-        userRepository.save(user3);
+        createUser("ABC", "abc@test.com", "abc123");
+        createUser("XYZ", "xyz@test.com", "xyz123");
+        createUser("DEF", "def@test.com", "def123");
 
         List<User> allUsers = userRepository.findAll();
 
@@ -79,25 +69,24 @@ class UserRepositoryTest {
 
     @Test
     void testUpdateUser() {
-        User user = new User();
-        user.setName("Michael");
-        user.setEmail("michael@test.com");
-
-        User saved = userRepository.save(user);
+        User saved = createUser("Michael", "michael@test.com", "mike123");
         Long userId = saved.getId();
 
-        saved.setName("Michael");
-        saved.setEmail("michael@test.com");
+        saved.setName("Michael Updated");
+        saved.setEmail("michael.updated@test.com");
+        saved.setPassword("mikeUpdated123");
 
         User updated = userRepository.save(saved);
 
-        assertEquals(userId, updated.getId(), "ID should remain the same");
-        assertEquals("Michael", updated.getName());
-        assertEquals("michael@test.com", updated.getEmail());
+        assertEquals(userId, updated.getId());
+        assertEquals("Michael Updated", updated.getName());
+        assertEquals("michael.updated@test.com", updated.getEmail());
+        assertEquals("mikeUpdated123", updated.getPassword());
 
         Optional<User> fetched = userRepository.findById(userId);
         assertTrue(fetched.isPresent());
-        assertEquals("Michael", fetched.get().getName());
-        assertEquals("michael@test.com", fetched.get().getEmail());
+        assertEquals("Michael Updated", fetched.get().getName());
+        assertEquals("michael.updated@test.com", fetched.get().getEmail());
+        assertEquals("mikeUpdated123", fetched.get().getPassword());
     }
 }

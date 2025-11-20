@@ -46,16 +46,15 @@ public class UserController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<UserResponse>>> getAll(
-            @RequestParam(defaultValue = "1") int page // 1-based page
+            @RequestParam(defaultValue = "1") int page
     ) {
         Pageable pageable = PageRequest.of(page - 1, DEFAULT_PAGE_SIZE, Sort.by("id").ascending());
         Page<UserResponse> userPage = userService.getAllUsers(pageable);
 
         PageInfo pageInfo = new PageInfo(
-                page, // return 1-based page to client
+                page,
                 userPage.getSize(),
                 userPage.getTotalElements(),
-                userPage.getTotalPages(),
                 userPage.hasNext(),
                 userPage.hasPrevious()
         );
@@ -73,7 +72,7 @@ public class UserController {
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<UserResponse>>> search(
             @RequestParam String keyword,
-            @RequestParam(defaultValue = "1") int page // 1-based page
+            @RequestParam(defaultValue = "1") int page
     ) {
         Pageable pageable = PageRequest.of(page - 1, DEFAULT_PAGE_SIZE, Sort.by("id").ascending());
         Page<UserResponse> userPage = userService.searchUsers(keyword, pageable);
@@ -82,7 +81,6 @@ public class UserController {
                 page,
                 userPage.getSize(),
                 userPage.getTotalElements(),
-                userPage.getTotalPages(),
                 userPage.hasNext(),
                 userPage.hasPrevious()
         );

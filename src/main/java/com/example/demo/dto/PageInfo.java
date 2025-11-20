@@ -12,8 +12,7 @@ import lombok.Setter;
 public class PageInfo {
     private int currentPage;
     private int pageSize;
-    private long totalElements;
-    private int totalPages;
+    private long total;
     private boolean hasNext;
     private boolean hasPrevious;
 }
