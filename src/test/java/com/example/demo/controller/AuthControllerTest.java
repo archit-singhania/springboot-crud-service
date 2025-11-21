@@ -13,6 +13,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 class AuthControllerTest {
@@ -62,11 +64,13 @@ class AuthControllerTest {
 
         when(userRepo.findByEmail(email)).thenReturn(Optional.of(user));
         when(encoder.matches(password, encodedPassword)).thenReturn(true);
-        when(jwt.generateToken(email)).thenReturn(token);
+        when(jwt.generateAccessToken(anyString())).thenReturn("fake-access-token");
+        when(jwt.generateRefreshToken(anyString())).thenReturn("fake-refresh-token");
 
         var response = authController.login(new com.example.demo.dto.LoginRequest(email, password));
 
-        assertEquals(token, response.getToken());
+        assertEquals("fake-access-token", response.getAccessToken());
+        assertEquals("fake-refresh-token", response.getRefreshToken());
     }
 
     @Test

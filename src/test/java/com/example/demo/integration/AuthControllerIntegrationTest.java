@@ -1,5 +1,7 @@
 package com.example.demo.integration;
 
+import com.example.demo.dto.LoginRequest;
+import com.example.demo.dto.LoginResponse;
 import com.example.demo.model.User;
 import com.example.demo.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -12,7 +14,6 @@ import org.springframework.http.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-
 class AuthControllerIntegrationTest {
 
     @LocalServerPort
@@ -26,25 +27,31 @@ class AuthControllerIntegrationTest {
 
     @Test
     void testRegisterAndLogin() {
-        String url = "http://localhost:" + port + "/auth/register";
+
+        // Register
+        String registerUrl = "http://localhost:" + port + "/auth/register";
 
         User user = new User();
         user.setEmail("integration@example.com");
         user.setPassword("password");
         user.setName("Integration User");
 
-        ResponseEntity<String> registerResponse = restTemplate.postForEntity(url, user, String.class);
+        ResponseEntity<String> registerResponse =
+                restTemplate.postForEntity(registerUrl, user, String.class);
+
         assertEquals(HttpStatus.OK, registerResponse.getStatusCode());
         assertEquals("Registration successful", registerResponse.getBody());
 
         // Login
         String loginUrl = "http://localhost:" + port + "/auth/login";
-        var loginReq = new com.example.demo.dto.LoginRequest("integration@example.com", "password");
+        LoginRequest loginReq = new LoginRequest("integration@example.com", "password");
 
-        ResponseEntity<com.example.demo.dto.LoginResponse> loginResponse =
-                restTemplate.postForEntity(loginUrl, loginReq, com.example.demo.dto.LoginResponse.class);
+        ResponseEntity<LoginResponse> loginResponse =
+                restTemplate.postForEntity(loginUrl, loginReq, LoginResponse.class);
 
         assertEquals(HttpStatus.OK, loginResponse.getStatusCode());
-        assertNotNull(loginResponse.getBody().getToken());
+        assertNotNull(loginResponse.getBody());
+        assertNotNull(loginResponse.getBody().getAccessToken());
+        assertNotNull(loginResponse.getBody().getRefreshToken());
     }
 }

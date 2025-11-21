@@ -1,5 +1,6 @@
 package com.example.demo.security;
 
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,7 +31,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // Skip JWT validation for public endpoints
         if (path.equals("/auth/login") ||
                 path.equals("/auth/register") ||
                 path.equals("/") ||
@@ -39,32 +39,62 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Normal JWT validation
-        String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
+        String accessToken = extractToken(request.getHeader("Authorization"));
+        String refreshToken = request.getHeader("X-Refresh-Token");
+
+        if (accessToken == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
         try {
-            String token = header.substring(7);
-            String email = jwtTokenUtil.extractEmail(token);
+            String email = null;
+
+            try {
+                email = jwtTokenUtil.extractEmail(accessToken);
+            } catch (ExpiredJwtException e) {
+                email = e.getClaims().getSubject();
+            }
 
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails user = userDetailsService.loadUserByUsername(email);
 
-                if (jwtTokenUtil.isTokenValid(token)) {
-                    UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                boolean isTokenValid = jwtTokenUtil.isTokenValid(accessToken);
+                boolean isAccessTokenType = jwtTokenUtil.isAccessToken(accessToken);
+
+                if (isTokenValid && isAccessTokenType) {
+                    authenticateUser(user, request);
+                } else {
+                    if (refreshToken != null) {
+                        boolean isRefreshValid = jwtTokenUtil.isTokenValid(refreshToken);
+                        boolean isRefreshTokenType = jwtTokenUtil.isRefreshToken(refreshToken);
+
+                        if (isRefreshValid && isRefreshTokenType) {
+                            String newAccessToken = jwtTokenUtil.generateAccessToken(email);
+                            response.setHeader("X-New-Access-Token", newAccessToken);
+                            authenticateUser(user, request);
+                        }
+                    }
                 }
             }
         } catch (Exception e) {
-            // Log the exception if needed
-            // Don't throw - let Spring Security handle it
+            // Token validation failed
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String extractToken(String header) {
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7);
+        }
+        return null;
+    }
+
+    private void authenticateUser(UserDetails user, HttpServletRequest request) {
+        UsernamePasswordAuthenticationToken authToken =
+                new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authToken);
     }
 }

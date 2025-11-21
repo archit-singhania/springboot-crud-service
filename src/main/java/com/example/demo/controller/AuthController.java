@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.LoginRequest;
 import com.example.demo.dto.LoginResponse;
+import com.example.demo.dto.RefreshTokenRequest;
 import com.example.demo.model.User;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.security.JwtTokenUtil;
@@ -27,7 +28,6 @@ public class AuthController {
 
     @PostMapping("/login")
     public LoginResponse login(@RequestBody LoginRequest loginRequest) {
-
         User user = userRepo.findByEmail(loginRequest.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -35,7 +35,23 @@ public class AuthController {
             throw new RuntimeException("Invalid Password");
         }
 
-        String token = jwt.generateToken(user.getEmail());
-        return new LoginResponse(token);
+        String accessToken = jwt.generateAccessToken(user.getEmail());
+        String refreshToken = jwt.generateRefreshToken(user.getEmail());
+
+        return new LoginResponse(accessToken, refreshToken);
+    }
+
+    @PostMapping("/refresh")
+    public LoginResponse refreshToken(@RequestBody RefreshTokenRequest request) {
+        String refreshToken = request.getRefreshToken();
+
+        if (!jwt.isTokenValid(refreshToken) || !jwt.isRefreshToken(refreshToken)) {
+            throw new RuntimeException("Invalid refresh token");
+        }
+
+        String email = jwt.extractEmail(refreshToken);
+        String newAccessToken = jwt.generateAccessToken(email);
+
+        return new LoginResponse(newAccessToken, refreshToken);
     }
 }
