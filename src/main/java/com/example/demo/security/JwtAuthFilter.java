@@ -28,27 +28,41 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
+        String path = request.getRequestURI();
 
+        // Skip JWT validation for public endpoints
+        if (path.equals("/auth/login") ||
+                path.equals("/auth/register") ||
+                path.equals("/") ||
+                path.startsWith("/error")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // Normal JWT validation
+        String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = header.substring(7);
-        String email = jwtTokenUtil.extractEmail(token);
+        try {
+            String token = header.substring(7);
+            String email = jwtTokenUtil.extractEmail(token);
 
-        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails user = userDetailsService.loadUserByUsername(email);
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails user = userDetailsService.loadUserByUsername(email);
 
-            if (jwtTokenUtil.isTokenValid(token)) {
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                if (jwtTokenUtil.isTokenValid(token)) {
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (Exception e) {
+            // Log the exception if needed
+            // Don't throw - let Spring Security handle it
         }
 
         filterChain.doFilter(request, response);
