@@ -14,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,6 +34,7 @@ public class UserController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> create(@Valid @RequestBody UserRequest req) {
         UserResponse response = userService.createUser(req);
         ApiResponse<UserResponse> apiResponse = new ApiResponse<>(
@@ -45,6 +47,7 @@ public class UserController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'USER')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> getAll(
             @RequestParam(defaultValue = "1") int page
     ) {
@@ -70,6 +73,7 @@ public class UserController {
     }
 
     @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'USER')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> search(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "1") int page
@@ -96,6 +100,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'USER')")
     public ResponseEntity<ApiResponse<UserResponse>> getOne(@PathVariable Long id) {
         UserResponse user = userService.getUserById(id);
         ApiResponse<UserResponse> apiResponse = new ApiResponse<>(
@@ -108,6 +113,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<UserResponse>> update(
             @PathVariable Long id,
             @RequestBody @Valid UserRequest req
@@ -123,6 +129,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable Long id) {
         try {
             userService.deleteUser(id);
@@ -145,6 +152,7 @@ public class UserController {
     }
 
     @PutMapping("/restore/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> restore(@PathVariable Long id) {
         userService.restoreUser(id);
         ApiResponse<String> apiResponse = new ApiResponse<>(

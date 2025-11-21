@@ -6,21 +6,22 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
-
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 import java.util.Arrays;
 
 @Configuration
 @RequiredArgsConstructor
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
@@ -28,7 +29,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        http.csrf(csrf -> csrf.disable())
+        http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/auth/login",
@@ -45,10 +47,8 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
-                            // Check if request expects HTML (browser) or JSON (Postman/API)
                             String acceptHeader = request.getHeader("Accept");
                             if (acceptHeader != null && acceptHeader.contains("text/html")) {
-                                // Browser request - send error response directly (no redirect to avoid loop)
                                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                                 response.setContentType("text/html");
                                 response.getWriter().write(
@@ -62,7 +62,6 @@ public class SecurityConfig {
                                                 "<body><div class='container'><h1>401</h1><p>Unauthorized! Please login to access this resource.</p></div></body></html>"
                                 );
                             } else {
-                                // API request - return JSON
                                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                                 response.setContentType("application/json");
                                 response.getWriter().write(
@@ -71,7 +70,6 @@ public class SecurityConfig {
                             }
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
-                            // Handle 403 Forbidden
                             String acceptHeader = request.getHeader("Accept");
                             if (acceptHeader != null && acceptHeader.contains("text/html")) {
                                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
@@ -114,18 +112,18 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("*")); // Configure as needed
+        configuration.setAllowedOrigins(Arrays.asList("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setExposedHeaders(Arrays.asList(
-                "X-New-Access-Token", 
+                "X-New-Access-Token",
                 "X-New-Refresh-Token",
                 "Authorization",
                 "X-Refresh-Token"
         ));
-        
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
-        return source;  
+        return source;
     }
 }

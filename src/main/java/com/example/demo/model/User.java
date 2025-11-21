@@ -25,5 +25,8 @@ public class User {
     private String password;
 
     @Column(nullable = false)
+    private String role = "USER";
+
+    @Column(nullable = false)
     private boolean isDeleted = false;
 }

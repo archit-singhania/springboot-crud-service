@@ -22,6 +22,9 @@ public class AuthController {
     @PostMapping("/register")
     public String register(@RequestBody User user) {
         user.setPassword(encoder.encode(user.getPassword()));
+        if (user.getRole() == null || user.getRole().isEmpty()) {
+            user.setRole("USER");
+        }
         userRepo.save(user);
         return "Registration successful";
     }
