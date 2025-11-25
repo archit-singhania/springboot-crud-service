@@ -80,7 +80,7 @@ public class SSOExchangeController {
         String serviceToken = authorization.substring(7);
         log.info("Organization profile requested for: {}", orgId);
 
-        SSOExchangeMaster orgProfile = ssoService.getOrganizationProfile(orgId, serviceToken);
+        SSOExchangeMaster orgProfile = ssoService.getOrganizationProfile(orgId);
         return ResponseEntity.ok(orgProfile);
     }
 

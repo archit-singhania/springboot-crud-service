@@ -1,0 +1,254 @@
+{
+  "info": {
+    "name": "SSO Exchange Integration",
+    "description": "Complete OAuth2 PKCE flow with Common SSO integration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "state",
+      "value": "{{$randomUUID}}",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "profile_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "org_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/sso/health",
+          "host": ["{{base_url}}"],
+          "path": ["sso", "health"]
+        },
+        "description": "Verify SSO service is running"
+      }
+    },
+    {
+      "name": "2. Get Authorization URL",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const response = pm.response.json();",
+              "console.log('Authorization URL:', response.authorizationUrl);",
+              "console.log('State:', response.state);",
+              "console.log('\\n⚠️ MANUAL STEP REQUIRED:');",
+              "console.log('1. Copy the authorizationUrl from response');",
+              "console.log('2. Open it in browser');",
+              "console.log('3. Login with SSO credentials');",
+              "console.log('4. Copy the ?code= parameter from redirect URL');",
+              "console.log('5. Use it in the next request');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/sso/authorize?state={{state}}",
+          "host": ["{{base_url}}"],
+          "path": ["sso", "authorize"],
+          "query": [
+            {
+              "key": "state",
+              "value": "{{state}}"
+            }
+          ]
+        },
+        "description": "Step 1: Get authorization URL with PKCE\n\n✅ Copy the authorizationUrl from response\n✅ Open in browser and login\n✅ Copy the 'code' parameter from redirect URL"
+      }
+    },
+    {
+      "name": "3. Exchange Auth Code for Tokens",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const response = pm.response.json();",
+              "pm.collectionVariables.set('access_token', response.accessToken);",
+              "pm.collectionVariables.set('refresh_token', response.refreshToken);",
+              "pm.collectionVariables.set('id_token', response.idToken);",
+              "pm.collectionVariables.set('profile_id', response.profileId);",
+              "pm.collectionVariables.set('org_id', response.orgId);",
+              "console.log('✅ Tokens saved to variables');",
+              "console.log('Access Token:', response.accessToken.substring(0, 50) + '...');",
+              "console.log('Profile ID:', response.profileId);",
+              "console.log('Org ID:', response.orgId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/sso/callback?code=PASTE_AUTH_CODE_HERE&state={{state}}",
+          "host": ["{{base_url}}"],
+          "path": ["sso", "callback"],
+          "query": [
+            {
+              "key": "code",
+              "value": "PASTE_AUTH_CODE_HERE",
+              "description": "Replace with actual code from redirect URL"
+            },
+            {
+              "key": "state",
+              "value": "{{state}}"
+            }
+          ]
+        },
+        "description": "Step 2: Exchange authorization code for custom tokens\n\n⚠️ IMPORTANT: Replace 'PASTE_AUTH_CODE_HERE' with actual code from browser redirect\n\nThis will:\n✅ Validate Okta tokens using JWKS\n✅ Fetch full profile from Common SSO\n✅ Store ALL company data in database\n✅ Return custom Exchange tokens"
+      }
+    },
+    {
+      "name": "4. Get User Profile",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const response = pm.response.json();",
+              "console.log('=== PROFILE DATA ===');",
+              "console.log('Profile ID:', response.profileId);",
+              "console.log('Org ID:', response.orgId);",
+              "console.log('Company Name:', response.companyName);",
+              "console.log('Email:', response.email);",
+              "console.log('GST Number:', response.gstNumber);",
+              "console.log('Status:', response.status);",
+              "console.log('Exchange Access:', response.exchangeAccess);",
+              "console.log('Registrations:', JSON.parse(response.registrations || '[]'));",
+              "console.log('\\n✅ ALL fields from Common SSO should be populated');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/sso/profile",
+          "host": ["{{base_url}}"],
+          "path": ["sso", "profile"]
+        },
+        "description": "Get complete user profile with ALL fields:\n✅ Company details (name, address, GST, CIN, PAN)\n✅ Authorized person info\n✅ Organization status\n✅ Portal registrations\n✅ Compliance status"
+      }
+    },
+    {
+      "name": "5. Validate Okta Token (JWKS)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{id_token}}",
+            "type": "text",
+            "description": "Use ID token from login response"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/sso/validate-okta-token",
+          "host": ["{{base_url}}"],
+          "path": ["sso", "validate-okta-token"]
+        },
+        "description": "Validate Okta ID token using JWKS verification\n\n✅ Verifies token signature\n✅ Checks issuer and audience\n✅ Validates expiration"
+      }
+    },
+    {
+      "name": "6. Refresh Tokens",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const response = pm.response.json();",
+              "pm.collectionVariables.set('access_token', response.accessToken);",
+              "pm.collectionVariables.set('refresh_token', response.refreshToken);",
+              "console.log('✅ Tokens refreshed and saved');",
+              "console.log('New Access Token:', response.accessToken.substring(0, 50) + '...');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/sso/refresh",
+          "host": ["{{base_url}}"],
+          "path": ["sso", "refresh"]
+        },
+        "description": "Refresh custom Exchange tokens\n\nThis will:\n✅ Validate refresh token\n✅ Refresh Okta tokens if expired\n✅ Re-validate new Okta tokens with JWKS\n✅ Fetch updated profile from Common SSO\n✅ Generate new custom tokens"
+      }
+    },
+    {
+      "name": "7. Get Organization Profile",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/sso/org/{{org_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["sso", "org", "{{org_id}}"]
+        },
+        "description": "Fetch organization-level profile from Common SSO\n\n✅ Company information\n✅ Organization status\n✅ All registered portals"
+      }
+    }
+  ]
+}

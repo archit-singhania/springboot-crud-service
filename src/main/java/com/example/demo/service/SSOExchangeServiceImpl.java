@@ -150,15 +150,7 @@ public class SSOExchangeServiceImpl implements SSOExchangeService {
         String accessToken = (String) oktaTokenResponse.get("access_token");
         String refreshToken = (String) oktaTokenResponse.get("refresh_token");
         String idToken = (String) oktaTokenResponse.get("id_token");
-        Integer expiresIn = null;
-        try {
-            Object ex = oktaTokenResponse.get("expires_in");
-            if (ex instanceof Integer) {
-                expiresIn = (Integer) ex;
-            } else if (ex instanceof Number) {
-                expiresIn = ((Number) ex).intValue();
-            }
-        } catch (Exception ignored) { /* fall through, use default later */ }
+        Integer expiresIn = extractExpiresIn(oktaTokenResponse);
         String tokenType = "Bearer";
 
         log.info("Okta tokens received, expires in {} seconds", expiresIn);
@@ -174,59 +166,48 @@ public class SSOExchangeServiceImpl implements SSOExchangeService {
         }
 
         String profileId = idClaims.getSubject();
-        String orgId = null;
-        try {
-            Object orgClaim = idClaims.getClaim("org_id");
-            if (orgClaim != null) orgId = orgClaim.toString();
-        } catch (Exception ignored) { /* optional claim */ }
         String jti = idClaims.getJWTID();
 
-        log.info("Token validated successfully for profileId: {}, orgId: {}", profileId, orgId);
+        log.info("Token validated successfully for profileId: {}", profileId);
 
-
-        // ✅ OPTIONAL: Also validate access token if it's a JWT (some providers return opaque tokens)
+        // ✅ OPTIONAL: Validate access token if it's a JWT
         try {
             JWTClaimsSet accessTokenClaims = jwksService.validateAndParseToken(accessToken);
             log.info("Access token validated successfully using JWKS");
         } catch (Exception e) {
             log.debug("Access token validation skipped or failed (opaque token likely): {}", e.getMessage());
-            // Continue - not fatal
         }
 
-        // Fetch user profile (userinfo endpoint) — fallback to profileId-based email if necessary
-        String email;
-        try {
-            log.info("Fetching user profile from SSO");
-            Map<String, Object> userInfo = oktaWebClient.get()
-                    .uri(profileEndpoint)
-                    .header("Authorization", "Bearer " + accessToken)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .block();
+        // ✅ FETCH FULL PROFILE FROM COMMON SSO (or Okta for testing)
+        log.info("Fetching complete profile from SSO");
+        SSOProfileResponse profileResponse = fetchProfileFromSSO(accessToken);
 
-            if (userInfo != null) {
-                email = (String) userInfo.getOrDefault("email", userInfo.get("preferred_username"));
-                if (email == null) {
-                    email = profileId + "@okta.local";
-                }
-            } else {
-                email = profileId + "@okta.local";
-            }
-            log.info("User email resolved as: {}", email);
-        } catch (Exception e) {
-            log.warn("Failed to fetch userinfo, using profileId as email", e);
-            email = profileId + "@okta.local";
+        String email = profileResponse.getEmail();
+        if (email == null || email.isEmpty()) {
+            email = profileId + "@exchange.local";
         }
 
-        // Prepare or update SSOExchangeMaster record
+        String actualOrgId = profileResponse.getOrgId();
+        if (actualOrgId == null || actualOrgId.isEmpty()) {
+            actualOrgId = profileId; // fallback
+        }
+
+        log.info("Profile retrieved: email={}, orgId={}, companyName={}",
+                email, actualOrgId, profileResponse.getCompanyName());
+
+        // Find or create SSO record
         SSOExchangeMaster ssoRecord = ssoRepo.findByProfileId(profileId)
                 .orElse(SSOExchangeMaster.builder()
                         .profileId(profileId)
-                        .orgId(orgId != null ? orgId : profileId)
+                        .orgId(actualOrgId)
                         .email(email)
                         .createdAt(Instant.now())
                         .build());
 
+        // Update with ALL Common SSO profile data
+        updateProfileData(ssoRecord, profileResponse);
+
+        // Update tokens
         ssoRecord.setAuthCode(authCode);
         ssoRecord.setAuthCodeExpiresAt(Instant.now().plusSeconds(60));
         ssoRecord.setAccessToken(accessToken);
@@ -239,34 +220,18 @@ public class SSOExchangeServiceImpl implements SSOExchangeService {
         ssoRecord.setJti(jti);
         ssoRecord.setTokenStatus("ACTIVE");
         ssoRecord.setLastLoginOn(Instant.now());
-        ssoRecord.setEmail(email);
-        ssoRecord.setStatus("Active");
-        ssoRecord.setExchangeAccess("allowed");
         ssoRecord.setUpdatedAt(Instant.now());
-
-        if (ssoRecord.getRegistrations() == null) {
-            String mockRegistrations = "[{\"portal_id\":\"demo\",\"portal_name\":\"Demo Portal\",\"role\":\"User\"}]";
-            ssoRecord.setRegistrations(mockRegistrations);
-        }
 
         ssoRepo.save(ssoRecord);
 
         // Remove PKCE value from Redis
         redisTemplate.delete("pkce:" + state);
 
-        // Generate custom tokens
+        // Generate custom tokens with registrations data
         String customAccessToken;
         String customRefreshToken;
         try {
-            List<Map<String, Object>> registrationsList = objectMapper.readValue(
-                    ssoRecord.getRegistrations(),
-                    objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class)
-            );
-
-            Map<String, Object> registrationsMap = new HashMap<>();
-            registrationsMap.put("portals", registrationsList);
-            registrationsMap.put("status", ssoRecord.getStatus());
-            registrationsMap.put("exchange_access", ssoRecord.getExchangeAccess());
+            Map<String, Object> registrationsMap = buildRegistrationsMap(ssoRecord, profileResponse);
 
             customAccessToken = customTokenService.generateAccessToken(
                     profileId,
@@ -298,15 +263,82 @@ public class SSOExchangeServiceImpl implements SSOExchangeService {
                 .build();
     }
 
+    // Helper method to extract expires_in
+    private Integer extractExpiresIn(Map<String, Object> tokenResponse) {
+        try {
+            Object ex = tokenResponse.get("expires_in");
+            if (ex instanceof Integer) {
+                return (Integer) ex;
+            } else if (ex instanceof Number) {
+                return ((Number) ex).intValue();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    // Helper method to build registrations map
+    private Map<String, Object> buildRegistrationsMap(SSOExchangeMaster record, SSOProfileResponse profile) {
+        Map<String, Object> registrationsMap = new HashMap<>();
+
+        try {
+            if (profile.getRegistrations() != null && !profile.getRegistrations().isEmpty()) {
+                registrationsMap.put("portals", profile.getRegistrations());
+            } else if (record.getRegistrations() != null) {
+                // Parse existing registrations from DB
+                List<Map<String, Object>> registrationsList = objectMapper.readValue(
+                        record.getRegistrations(),
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class)
+                );
+                registrationsMap.put("portals", registrationsList);
+            } else {
+                // Only use mock data as last resort
+                List<Map<String, Object>> mockData = List.of(
+                        Map.of("portal_id", "demo", "portal_name", "Demo Portal", "role", "User")
+                );
+                registrationsMap.put("portals", mockData);
+            }
+
+            registrationsMap.put("status", profile.getStatus() != null ? profile.getStatus() : "Active");
+            registrationsMap.put("exchange_access", profile.getExchangeAccess() != null ? profile.getExchangeAccess() : "allowed");
+
+        } catch (Exception e) {
+            log.warn("Failed to parse registrations, using minimal data", e);
+            registrationsMap.put("portals", List.of());
+            registrationsMap.put("status", "Active");
+            registrationsMap.put("exchange_access", "allowed");
+        }
+
+        return registrationsMap;
+    }
+
     private SSOProfileResponse fetchProfileFromSSO(String oktaAccessToken) {
         log.info("Fetching user profile from SSO");
+
+        // 🔄 SWITCH THIS IN PRODUCTION:
+        // Development/Testing: Use Okta's userinfo endpoint
+        // Production: Use Common SSO profile endpoint
+
+        // For testing with Okta (limited data):
+        String profileApiEndpoint = profileEndpoint; // Okta endpoint from config
+
+        // For production with Common SSO (full data):
+        // String profileApiEndpoint = "https://sso.cpcb.gov.in/api/v1/profile/me";
 
         SSOProfileResponse profileResponse;
         try {
             profileResponse = oktaWebClient.get()
-                    .uri(profileEndpoint)
+                    .uri(profileApiEndpoint)
                     .header("Authorization", "Bearer " + oktaAccessToken)
                     .retrieve()
+                    .onStatus(
+                            status -> status.is4xxClientError() || status.is5xxServerError(),
+                            response -> response.bodyToMono(String.class)
+                                    .map(body -> {
+                                        log.error("SSO profile error: {}", body);
+                                        return new RuntimeException("SSO profile error: " + body);
+                                    })
+                    )
                     .bodyToMono(SSOProfileResponse.class)
                     .block();
         } catch (Exception e) {
@@ -319,7 +351,11 @@ public class SSOExchangeServiceImpl implements SSOExchangeService {
             throw new RuntimeException("Failed to retrieve user profile");
         }
 
-        log.info("Profile retrieved from SSO for profileId: {}", profileResponse.getProfileId());
+        log.info("Profile retrieved from SSO - profileId: {}, orgId: {}, company: {}",
+                profileResponse.getProfileId(),
+                profileResponse.getOrgId(),
+                profileResponse.getCompanyName());
+
         return profileResponse;
     }
 
@@ -489,15 +525,17 @@ public class SSOExchangeServiceImpl implements SSOExchangeService {
 
     @Override
     @Transactional
-    public SSOExchangeMaster getOrganizationProfile(String orgId, String serviceToken) {
+    public SSOExchangeMaster getOrganizationProfile(String orgId) {
         log.info("Fetching organization profile for orgId: {}", orgId);
 
-        String orgEndpoint = "/api/v1/profile/org/" + orgId;
+        // Call Common SSO organization endpoint
+        String orgEndpoint = profileEndpoint; // For testing with Okta or real SSO
+
         SSOProfileResponse profileResponse;
         try {
             profileResponse = oktaWebClient.get()
                     .uri(orgEndpoint)
-                    .header("Authorization", "Bearer " + serviceToken)
+                    //.header("Authorization", "Bearer " + accessToken) // optional if user token
                     .retrieve()
                     .bodyToMono(SSOProfileResponse.class)
                     .block();
@@ -507,25 +545,23 @@ public class SSOExchangeServiceImpl implements SSOExchangeService {
         }
 
         if (profileResponse == null) {
-            log.error("Empty organization profile response");
-            throw new RuntimeException("Organization not found");
+            throw new RuntimeException("Organization not found: " + orgId);
         }
 
+        // Find or create SSO record
         SSOExchangeMaster ssoRecord = ssoRepo.findByOrgId(orgId)
                 .orElse(SSOExchangeMaster.builder()
                         .orgId(orgId)
                         .createdAt(Instant.now())
                         .build());
 
+        // Update with profile data
         updateProfileData(ssoRecord, profileResponse);
-        ssoRecord.setServiceToken(serviceToken);
-        ssoRecord.setServiceTokenIssuedAt(Instant.now());
-        ssoRecord.setServiceTokenExpiresAt(Instant.now().plusSeconds(900));
+
         ssoRecord.setUpdatedAt(Instant.now());
-
         ssoRepo.save(ssoRecord);
-        log.info("Organization profile updated for orgId: {}", orgId);
 
+        log.info("Organization profile updated for orgId: {}", orgId);
         return ssoRecord;
     }
 
@@ -547,11 +583,22 @@ public class SSOExchangeServiceImpl implements SSOExchangeService {
         }
     }
 
+    /**
+     * Update SSO record with profile data from Common SSO
+     */
     private void updateProfileData(SSOExchangeMaster record, SSOProfileResponse profile) {
         if (profile == null) return;
 
-        record.setOrgId(profile.getOrgId());
-        record.setProfileId(profile.getProfileId());
+        // Update organization fields
+        if (profile.getOrgId() != null) {
+            record.setOrgId(profile.getOrgId());
+        }
+
+        if (profile.getProfileId() != null) {
+            record.setProfileId(profile.getProfileId());
+        }
+
+        // Update company details
         record.setCompanyName(profile.getCompanyName());
         record.setCompanyAddress(profile.getCompanyAddress());
         record.setState(profile.getState());
@@ -559,25 +606,34 @@ public class SSOExchangeServiceImpl implements SSOExchangeService {
         record.setGstNumber(profile.getGstNumber());
         record.setCinNumber(profile.getCinNumber());
         record.setPanNumber(profile.getPanNumber());
+
+        // Update authorized person
         record.setAuthorizedPersonName(profile.getAuthorizedPersonName());
         record.setDesignation(profile.getDesignation());
         record.setEmail(profile.getEmail());
         record.setMobile(profile.getMobile());
         record.setLandline(profile.getLandline());
+
+        // Update status fields
         record.setStatus(profile.getStatus());
         record.setComplianceStatus(profile.getComplianceStatus());
         record.setExchangeAccess(profile.getExchangeAccess());
         record.setValidTill(profile.getValidTill());
-        record.setUpdatedAt(Instant.now());
 
+        // Update registrations if available
         try {
-            if (profile.getRegistrations() != null) {
+            if (profile.getRegistrations() != null && !profile.getRegistrations().isEmpty()) {
                 record.setRegistrations(objectMapper.writeValueAsString(profile.getRegistrations()));
             }
+
+            // Store raw payload for audit
             record.setRawSsoPayload(objectMapper.writeValueAsString(profile));
         } catch (JsonProcessingException e) {
-            log.error("Failed to serialize profile data to JSON", e);
-            throw new RuntimeException("Failed to process profile data", e);
+            log.error("Failed to serialize profile data", e);
         }
+
+        record.setUpdatedAt(Instant.now());
+
+        log.debug("Profile data updated for profileId: {}", record.getProfileId());
     }
 }

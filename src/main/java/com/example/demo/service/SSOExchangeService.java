@@ -10,5 +10,5 @@ public interface SSOExchangeService {
     LoginResponse exchangeAuthCode(String authCode, String state);
     SSOExchangeMaster getProfile(String accessToken);
     LoginResponse refreshAccessToken(String refreshToken);
-    SSOExchangeMaster getOrganizationProfile(String orgId, String serviceToken);
+    SSOExchangeMaster getOrganizationProfile(String orgId);
 }
