@@ -1,75 +1,88 @@
 package com.example.demo.security;
 
+import com.example.demo.service.CustomTokenService;
+import com.nimbusds.jwt.JWTClaimsSet;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtTokenUtil jwtTokenUtil;
-    private final UserDetailsService userDetailsService;
+    private final CustomUserDetailsService customUserDetailsService;
+    private final CustomTokenService customTokenService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
-                                    FilterChain filterChain)
-            throws ServletException, IOException {
+                                    FilterChain filterChain) throws ServletException, IOException {
 
-        String path = request.getRequestURI();
-
-        if (path.equals("/auth/login") ||
-                path.equals("/auth/register") ||
-                path.equals("/") ||
-                path.startsWith("/error")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        String accessToken = extractToken(request.getHeader("Authorization"));
+        String token = extractToken(request);
         String refreshToken = request.getHeader("X-Refresh-Token");
 
-        if (accessToken == null) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
         try {
-            String email = null;
+            if (token != null) {
+                if (customTokenService.isCustomToken(token)) {
+                    log.debug("Processing custom Exchange token");
+                    JWTClaimsSet claims = customTokenService.validateAndParseToken(token);
 
-            try {
-                email = jwtTokenUtil.extractEmail(accessToken);
-            } catch (ExpiredJwtException e) {
-                email = e.getClaims().getSubject();
-            }
+                    String profileId = claims.getSubject();
+                    String orgId = (String) claims.getClaim("org_id");
+                    Map<String, Object> registrations = (Map<String, Object>) claims.getClaim("registrations");
 
-            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails user = userDetailsService.loadUserByUsername(email);
+                    ExchangeUserDetails userDetails = ExchangeUserDetails.builder()
+                            .profileId(profileId)
+                            .orgId(orgId)
+                            .registrations(registrations)
+                            .build();
 
-                boolean isTokenValid = jwtTokenUtil.isTokenValid(accessToken);
-                boolean isAccessTokenType = jwtTokenUtil.isAccessToken(accessToken);
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                            );
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                if (isTokenValid && isAccessTokenType) {
-                    authenticateUser(user, request);
-                } else {
-                    if (refreshToken != null) {
-                        boolean isRefreshValid = jwtTokenUtil.isTokenValid(refreshToken);
-                        boolean isRefreshTokenType = jwtTokenUtil.isRefreshToken(refreshToken);
+                    log.debug("Custom token authenticated for: {}", profileId);
+                }
+                else {
+                    String email = null;
+                    try {
+                        email = jwtTokenUtil.extractEmail(token);
+                    } catch (ExpiredJwtException e) {
+                        email = e.getClaims().getSubject();
+                    }
 
-                        if (isRefreshValid && isRefreshTokenType) {
+                    if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                        UserDetails user = customUserDetailsService.loadUserByUsername(email);
+
+                        if (jwtTokenUtil.isTokenValid(token) && jwtTokenUtil.isAccessToken(token)) {
+                            authenticateUser(user, request);
+                        } else if (refreshToken != null &&
+                                jwtTokenUtil.isTokenValid(refreshToken) &&
+                                jwtTokenUtil.isRefreshToken(refreshToken)) {
+
                             String newAccessToken = jwtTokenUtil.generateAccessToken(email);
                             response.setHeader("X-New-Access-Token", newAccessToken);
                             authenticateUser(user, request);
@@ -78,13 +91,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception e) {
-            // Token validation failed
+            log.error("Authentication failed: {}", e.getMessage());
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private String extractToken(String header) {
+    private String extractToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
             return header.substring(7);
         }
@@ -97,4 +112,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authToken);
     }
+}
+
+@lombok.Data
+@lombok.Builder
+class ExchangeUserDetails {
+    private String profileId;
+    private String orgId;
+    private Map<String, Object> registrations;
 }

@@ -1,14 +1,22 @@
 package com.example.demo.dto;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Getter
-@Setter
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class LoginResponse {
     private String accessToken;
     private String refreshToken;
-    private String tokenType = "Bearer";
+    private String idToken;
+    private String tokenType;
+    private Long expiresInSeconds;
+    private String orgId;
+    private String profileId;
 
     public LoginResponse(String accessToken, String refreshToken) {
         this.accessToken = accessToken;

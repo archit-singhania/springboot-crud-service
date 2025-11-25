@@ -1,0 +1,21 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: my-cluster
+  namespace: kafka
+spec:
+  kafka:
+    version: 4.0.0
+    nodePools:
+      - name: kp-0
+        replicas: 1
+        listeners:
+          - name: plain
+            port: 9092
+            type: internal
+            tls: false
+        storage:
+          type: ephemeral
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}

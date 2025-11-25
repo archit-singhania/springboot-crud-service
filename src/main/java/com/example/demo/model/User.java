@@ -3,6 +3,7 @@ package com.example.demo.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+@Data
 @Entity
 @Table(name = "users")
 @Getter
@@ -29,4 +30,17 @@ public class User {
 
     @Column(nullable = false)
     private boolean isDeleted = false;
+
+    private String oktaId;
+
+    private String userType;
+
+    @Column(columnDefinition = "jsonb")
+    private String permissions; 
+
+    @Column(columnDefinition = "jsonb")
+    private String resources;    
+
+    @Column(columnDefinition = "jsonb")
+    private String metadata;   
 }

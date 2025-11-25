@@ -32,6 +32,7 @@ public class SecurityConfig {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+
                         .requestMatchers(
                                 "/auth/login",
                                 "/auth/register",
@@ -40,14 +41,30 @@ public class SecurityConfig {
                                 "/error",
                                 "/error/**"
                         ).permitAll()
+
+                        .requestMatchers(
+                                "/sso/authorize",
+                                "/sso/callback",
+                                "/sso/health"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                "/sso/profile",
+                                "/sso/refresh",
+                                "/sso/org/**"
+                        ).authenticated()
+
                         .anyRequest().authenticated()
                 )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
+
                 .exceptionHandling(ex -> ex
+
                         .authenticationEntryPoint((request, response, authException) -> {
                             String acceptHeader = request.getHeader("Accept");
+
                             if (acceptHeader != null && acceptHeader.contains("text/html")) {
                                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                                 response.setContentType("text/html");
@@ -59,18 +76,22 @@ public class SecurityConfig {
                                                 ".container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }" +
                                                 "h1 { color: #e74c3c; font-size: 48px; margin: 0; }" +
                                                 "p { color: #555; font-size: 18px; }</style></head>" +
-                                                "<body><div class='container'><h1>401</h1><p>Unauthorized! Please login to access this resource.</p></div></body></html>"
+                                                "<body><div class='container'><h1>401</h1><p>Unauthorized! Please login.</p></div></body></html>"
                                 );
                             } else {
                                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                                 response.setContentType("application/json");
+                                response.setCharacterEncoding("UTF-8");
                                 response.getWriter().write(
-                                        "{\"status\":\"failure\",\"message\":\"Unauthorized - Authentication required\",\"data\":null,\"statusCode\":401}"
+                                        "{\"status\":\"error\",\"message\":\"Unauthorized\",\"statusCode\":401}"
                                 );
+                                response.getWriter().flush();
                             }
                         })
+
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             String acceptHeader = request.getHeader("Accept");
+
                             if (acceptHeader != null && acceptHeader.contains("text/html")) {
                                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                                 response.setContentType("text/html");
@@ -82,17 +103,20 @@ public class SecurityConfig {
                                                 ".container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }" +
                                                 "h1 { color: #e74c3c; font-size: 48px; margin: 0; }" +
                                                 "p { color: #555; font-size: 18px; }</style></head>" +
-                                                "<body><div class='container'><h1>403</h1><p>Forbidden! You don't have permission to access this resource.</p></div></body></html>"
+                                                "<body><div class='container'><h1>403</h1><p>Forbidden! You don't have access.</p></div></body></html>"
                                 );
                             } else {
                                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                                 response.setContentType("application/json");
+                                response.setCharacterEncoding("UTF-8");
                                 response.getWriter().write(
-                                        "{\"status\":\"failure\",\"message\":\"Access Denied - Insufficient permissions\",\"data\":null,\"statusCode\":403}"
+                                        "{\"status\":\"error\",\"message\":\"Access Denied\",\"statusCode\":403}"
                                 );
+                                response.getWriter().flush();
                             }
                         })
                 )
+
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
