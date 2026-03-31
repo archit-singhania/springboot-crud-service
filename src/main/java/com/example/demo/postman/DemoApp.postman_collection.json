@@ -1,0 +1,167 @@
+{
+  "info": {
+    "name": "DemoApp",
+    "_postman_id": "demo-app-collection",
+    "description": "Postman collection for Demo Spring Boot API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth/Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"password\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/auth/register",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["auth", "register"]
+        }
+      }
+    },
+    {
+      "name": "Auth/Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"password\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/auth/login",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "Users/Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/users",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["users"]
+        }
+      }
+    },
+    {
+      "name": "Users/Get All",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/users?page=1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["users"],
+          "query": [
+            { "key": "page", "value": "1" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Users/Search",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/users/search?keyword=John&page=1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["users", "search"],
+          "query": [
+            { "key": "keyword", "value": "John" },
+            { "key": "page", "value": "1" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Users/Get One",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/users/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["users", "1"]
+        }
+      }
+    },
+    {
+      "name": "Users/Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"name\": \"Jane Doe\",\n    \"email\": \"jane@example.com\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/users/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["users", "1"]
+        }
+      }
+    },
+    {
+      "name": "Users/Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/users/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["users", "1"]
+        }
+      }
+    },
+    {
+      "name": "Users/Restore",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/users/restore/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["users", "restore", "1"]
+        }
+      }
+    }
+  ]
+}
