@@ -1,0 +1,786 @@
+{
+  "info": {
+    "name": "SSO Exchange - BUYER/SELLER Testing",
+    "description": "Complete OAuth2 PKCE flow for SSO users (Buyer, Seller) with RBAC testing",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.1.0"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "state",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "profile_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "grp_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "auth_code",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "current_role",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "available_roles",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. SSO Login Flow",
+      "item": [
+        {
+          "name": "Step 1: Request Authorization URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has authorization URL', function() {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.authorizationUrl).to.exist;",
+                  "    pm.expect(json.state).to.exist;",
+                  "    pm.collectionVariables.set('state', json.state);",
+                  "    console.log('State saved:', json.state);",
+                  "    console.log('Authorization URL:', json.authorizationUrl);",
+                  "    console.log('');",
+                  "    console.log('NEXT STEP: Open this URL in browser to login via Okta:');",
+                  "    console.log(json.authorizationUrl);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/authorize?state={{$randomUUID}}",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "authorize"],
+              "query": [
+                {
+                  "key": "state",
+                  "value": "{{$randomUUID}}"
+                }
+              ]
+            },
+            "description": "Generate authorization URL with PKCE. Copy the URL from response and open in browser."
+          }
+        },
+        {
+          "name": "Step 2: Exchange Auth Code for Tokens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has custom tokens', function() {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.accessToken).to.exist;",
+                  "    pm.expect(json.refreshToken).to.exist;",
+                  "    pm.expect(json.profileId).to.exist;",
+                  "    pm.expect(json.grpId).to.exist;",
+                  "    ",
+                  "    pm.collectionVariables.set('access_token', json.accessToken);",
+                  "    pm.collectionVariables.set('refresh_token', json.refreshToken);",
+                  "    pm.collectionVariables.set('id_token', json.idToken);",
+                  "    pm.collectionVariables.set('profile_id', json.profileId);",
+                  "    pm.collectionVariables.set('grp_id', json.grpId);",
+                  "    pm.collectionVariables.set('current_role', json.currentRole);",
+                  "    pm.collectionVariables.set('available_roles', JSON.stringify(json.availableRoles));",
+                  "    ",
+                  "    console.log('Custom Exchange tokens received!');",
+                  "    console.log('Profile ID:', json.profileId);",
+                  "    console.log('Group ID:', json.grpId);",
+                  "    console.log('Current Role:', json.currentRole);",
+                  "    console.log('Available Roles:', json.availableRoles);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// MANUAL STEP: After browser redirect, paste the 'code' parameter here",
+                  "// Example: ?code=ABC123&state=xyz",
+                  "// pm.collectionVariables.set('auth_code', 'PASTE_YOUR_CODE_HERE');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/callback?code={{auth_code}}&state={{state}}",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "callback"],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "{{auth_code}}",
+                  "description": "Auth code from Okta redirect"
+                },
+                {
+                  "key": "state",
+                  "value": "{{state}}"
+                }
+              ]
+            },
+            "description": "Exchange authorization code for custom Exchange tokens"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. SSO User Profile",
+      "item": [
+        {
+          "name": "Get Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has profile data', function() {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.profile_id).to.exist;",
+                  "    pm.expect(json.grp_id).to.exist;",
+                  "    pm.expect(json.email).to.exist;",
+                  "    console.log('Profile Data:', JSON.stringify(json, null, 2));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/profile",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get Detailed Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has detailed profile data', function() {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.profile_id).to.exist;",
+                  "    pm.expect(json.current_role).to.exist;",
+                  "    pm.expect(json.available_roles).to.exist;",
+                  "    ",
+                  "    console.log('Current Role:', json.current_role);",
+                  "    console.log('Available Roles:', json.available_roles);",
+                  "    console.log('Detailed Profile:', JSON.stringify(json, null, 2));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/profile/detailed",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "profile", "detailed"]
+            },
+            "description": "Get detailed profile with current_role and available_roles"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Token Management",
+      "item": [
+        {
+          "name": "Introspect Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"{{access_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/introspect",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "introspect"]
+            }
+          }
+        },
+        {
+          "name": "Validate Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Token is valid', function() {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.valid).to.be.true;",
+                  "    console.log('Token Validation:', JSON.stringify(json, null, 2));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"{{access_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/validate",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "validate"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Access Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('New access token received', function() {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.accessToken).to.exist;",
+                  "    pm.collectionVariables.set('access_token', json.accessToken);",
+                  "    console.log('Access token refreshed!');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refreshToken\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/logout",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Role Switching & Multi-Role Testing",
+      "description": "Test role switching functionality for users with multiple roles (BUYER <-> SELLER)",
+      "item": [
+        {
+          "name": "Switch Role to SELLER",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Role switched to SELLER', function() {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.accessToken).to.exist;",
+                  "    pm.expect(json.refreshToken).to.exist;",
+                  "    pm.expect(json.currentRole).to.equal('SELLER');",
+                  "    pm.expect(json.availableRoles).to.be.an('array');",
+                  "    ",
+                  "    // Save new tokens",
+                  "    pm.collectionVariables.set('access_token', json.accessToken);",
+                  "    pm.collectionVariables.set('refresh_token', json.refreshToken);",
+                  "    pm.collectionVariables.set('current_role', json.currentRole);",
+                  "    ",
+                  "    console.log('✅ Role switched successfully!');",
+                  "    console.log('New Access Token:', json.accessToken.substring(0, 50) + '...');",
+                  "    console.log('Current Role:', json.currentRole);",
+                  "    console.log('Available Roles:', json.availableRoles);",
+                  "    console.log('Message:', json.message);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// This will switch the role from current role to SELLER",
+                  "console.log('Switching role to SELLER...');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"new_role\": \"SELLER\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/switch-role",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "switch-role"]
+            },
+            "description": "Switch from current role to SELLER. Note: Old tokens are invalidated and NEW tokens are generated!"
+          }
+        },
+        {
+          "name": "Switch Role to BUYER",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Role switched to BUYER', function() {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.accessToken).to.exist;",
+                  "    pm.expect(json.refreshToken).to.exist;",
+                  "    pm.expect(json.currentRole).to.equal('BUYER');",
+                  "    pm.expect(json.availableRoles).to.be.an('array');",
+                  "    ",
+                  "    // Save new tokens",
+                  "    pm.collectionVariables.set('access_token', json.accessToken);",
+                  "    pm.collectionVariables.set('refresh_token', json.refreshToken);",
+                  "    pm.collectionVariables.set('current_role', json.currentRole);",
+                  "    ",
+                  "    console.log('✅ Role switched successfully!');",
+                  "    console.log('New Access Token:', json.accessToken.substring(0, 50) + '...');",
+                  "    console.log('Current Role:', json.currentRole);",
+                  "    console.log('Available Roles:', json.availableRoles);",
+                  "    console.log('Message:', json.message);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// This will switch the role from current role to BUYER",
+                  "console.log('Switching role to BUYER...');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"new_role\": \"BUYER\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/switch-role",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "switch-role"]
+            },
+            "description": "Switch from current role to BUYER. Note: Old tokens are invalidated and NEW tokens are generated!"
+          }
+        },
+        {
+          "name": "Verify Role After Switch",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Profile reflects new role', function() {",
+                  "    const json = pm.response.json();",
+                  "    const currentRole = pm.collectionVariables.get('current_role');",
+                  "    ",
+                  "    pm.expect(json.current_role).to.equal(currentRole);",
+                  "    pm.expect(json.available_roles).to.be.an('array');",
+                  "    ",
+                  "    console.log('✅ Profile verification successful!');",
+                  "    console.log('Current Role in Profile:', json.current_role);",
+                  "    console.log('Available Roles:', json.available_roles);",
+                  "    console.log('Full Profile:', JSON.stringify(json, null, 2));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/profile/detailed",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "profile", "detailed"]
+            },
+            "description": "Verify that the profile shows the new current_role after role switching"
+          }
+        },
+        {
+          "name": "Try Using Old Token (Should Fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401 Unauthorized', function() {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Old token is invalidated', function() {",
+                  "    console.log('✅ Old token correctly invalidated!');",
+                  "    console.log('This is expected behavior - role switching invalidates old tokens');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// MANUAL: Replace {{old_access_token}} with an old token from before role switch",
+                  "// This test demonstrates that old tokens are invalidated after role switching"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{old_access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/profile",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "profile"]
+            },
+            "description": "This should return 401 because old tokens are invalidated after role switch. Manually set {{old_access_token}} variable with a pre-switch token to test."
+          }
+        },
+        {
+          "name": "Error: Try Switching to Same Role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401 or 400', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 401]);",
+                  "});",
+                  "",
+                  "pm.test('Error message about same role', function() {",
+                  "    console.log('✅ Correctly prevented switching to same role!');",
+                  "    console.log('Response:', pm.response.json());",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// This should fail because you can't switch to your current role",
+                  "const currentRole = pm.collectionVariables.get('current_role');",
+                  "console.log('Current Role:', currentRole);",
+                  "console.log('Attempting to switch to the same role (should fail)...');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"new_role\": \"{{current_role}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/switch-role",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "switch-role"]
+            },
+            "description": "This test demonstrates that switching to the same role is not allowed (should return error)"
+          }
+        },
+        {
+          "name": "Error: Try Invalid Role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 or 401', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 401]);",
+                  "});",
+                  "",
+                  "pm.test('Error about invalid role', function() {",
+                  "    console.log('✅ Correctly rejected invalid role!');",
+                  "    console.log('Response:', pm.response.json());",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"new_role\": \"ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/sso/switch-role",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "sso", "switch-role"]
+            },
+            "description": "This test demonstrates that switching to an unavailable role is rejected (assuming ADMIN is not in available_roles)"
+          }
+        }
+      ]
+    }
+  ]
+}

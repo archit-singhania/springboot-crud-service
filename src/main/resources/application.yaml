@@ -1,0 +1,11 @@
+spring:
+  profiles:
+    active: ${SPRING_PROFILE:local}
+  application:
+    name: iam-nexus
+  
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: UTC
+    default-property-inclusion: non_null

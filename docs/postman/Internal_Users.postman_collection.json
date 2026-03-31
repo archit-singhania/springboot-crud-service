@@ -1,0 +1,443 @@
+{
+  "info": {
+    "name": "Internal Users API - RBAC Testing",
+    "_postman_id": "internal-users-collection",
+    "description": "Complete RBAC testing for Internal Users (SUPER_ADMIN, ADMIN, USER)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-login if token is missing or expired",
+          "if (!pm.collectionVariables.get('accessToken')) {",
+          "    console.log('No access token found, logging in...');",
+          "    pm.sendRequest({",
+          "        url: pm.collectionVariables.get('baseUrl') + '/exchange/v1/int/auth/login',",
+          "        method: 'POST',",
+          "        header: { 'Content-Type': 'application/json' },",
+          "        body: {",
+          "            mode: 'raw',",
+          "            raw: JSON.stringify({",
+          "                email: pm.collectionVariables.get('testEmail'),",
+          "                password: pm.collectionVariables.get('testPassword')",
+          "            })",
+          "        }",
+          "    }, function (err, res) {",
+          "        if (!err && res.code === 200) {",
+          "            const jsonData = res.json();",
+          "            pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+          "            pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
+          "            console.log('Auto-login successful!');",
+          "        } else {",
+          "            console.error('Auto-login failed:', err || res.status);",
+          "        }",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "testEmail",
+      "value": "admin@gmail.com",
+      "type": "string"
+    },
+    {
+      "key": "testPassword",
+      "value": "Admin@123",
+      "type": "string"
+    },
+    {
+      "key": "Email",
+      "value": "user@yahoo.com",
+      "type": "string"
+    },
+    {
+      "key": "Password",
+      "value": "pass@123",
+      "type": "string"
+    },
+    {
+      "key": "partnerEmail",
+      "value": "partner@bank.com",
+      "type": "string"
+    },
+    {
+      "key": "partnerPassword",
+      "value": "Partner@123",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lastUserId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Setup Test Users",
+      "item": [
+        {
+          "name": "Register Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201 or 409 (already exists)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Admin User\",\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\",\n    \"role\": \"ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"User\",\n    \"email\": \"{{Email}}\",\n    \"password\": \"{{Password}}\",\n    \"role\": \"USER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register Super Admin",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Partner User\",\n    \"email\": \"{{partnerEmail}}\",\n    \"password\": \"{{partnerPassword}}\",\n    \"role\": \"SUPER_ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "auth", "register"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Authentication Flow",
+      "item": [
+        {
+          "name": "Login as Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has tokens', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.accessToken).to.be.a('string');",
+                  "    pm.expect(jsonData.refreshToken).to.be.a('string');",
+                  "    pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "auth", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. User Management - ADMIN Only",
+      "item": [
+        {
+          "name": "Create User (Admin Access)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('lastUserId', jsonData.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test User\",\n    \"email\": \"test.user@example.com\",\n    \"password\": \"Test@123\",\n    \"role\": \"SUPER_ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "users"]
+            }
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/users?page=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "users"],
+              "query": [
+                { "key": "page", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/users/search?keyword=Test&page=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "users", "search"],
+              "query": [
+                { "key": "keyword", "value": "Test" },
+                { "key": "page", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/users/{{lastUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "users", "{{lastUserId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Updated Test User\",\n    \"email\": \"test.user.updated@example.com\",\n    \"role\": \"User\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/users/{{lastUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "users", "{{lastUserId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/users/{{lastUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "users", "{{lastUserId}}"]
+            }
+          }
+        },
+        {
+          "name": "Restore User (Admin Only)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/int/users/restore/{{lastUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "int", "users", "restore", "{{lastUserId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. RBAC Testing",
+      "item": [
+        {
+          "name": "ADMIN - All User Types",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/user-types",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "user-types"]
+            },
+            "description": "Should succeed for ADMIN"
+          }
+        },
+        {
+          "name": "ADMIN - Create User Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"id\": 99,\n    \"type\": \"test_type\",\n    \"role\": \"TEST_ROLE\",\n    \"description\": \"Test type for RBAC\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exchange/v1/user-types",
+              "host": ["{{baseUrl}}"],
+              "path": ["exchange", "v1", "user-types"]
+            },
+            "description": "Should succeed only for ADMIN"
+          }
+        }
+      ]
+    }
+  ]
+}

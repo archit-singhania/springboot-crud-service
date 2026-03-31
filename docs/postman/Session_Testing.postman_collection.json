@@ -1,0 +1,597 @@
+{
+  "info": {
+    "name": "Session Management Testing",
+    "_postman_id": "session-testing-collection",
+    "description": "Comprehensive session management testing for single device/browser enforcement",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/exchange/v1",
+      "type": "string"
+    },
+    {
+      "key": "testEmail",
+      "value": "session.test@example.com",
+      "type": "string"
+    },
+    {
+      "key": "testPassword",
+      "value": "password123",
+      "type": "string"
+    },
+    {
+      "key": "deviceA_accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deviceA_refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deviceB_accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deviceB_refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sso_deviceA_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sso_deviceB_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Test 1: Internal User Single Session",
+      "description": "Test single session enforcement for internal users",
+      "item": [
+        {
+          "name": "Step 1: Register Test User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Registration successful or user exists', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Session Test User\",\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\",\n    \"role\": \"ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Step 2A: Login from Device A (Chrome)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Tokens received', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.accessToken).to.be.a('string');",
+                  "    pm.expect(jsonData.refreshToken).to.be.a('string');",
+                  "    ",
+                  "    pm.collectionVariables.set('deviceA_accessToken', jsonData.accessToken);",
+                  "    pm.collectionVariables.set('deviceA_refreshToken', jsonData.refreshToken);",
+                  "    ",
+                  "    console.log('✅ Device A logged in successfully');",
+                  "    console.log('Access Token (Device A):', jsonData.accessToken.substring(0, 50) + '...');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "User-Agent", "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Step 2B: Test Device A Access (Should Work ✅)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Device A can access protected endpoint', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('✅ Device A access SUCCESSFUL');",
+                  "});",
+                  "",
+                  "pm.test('Profile data received', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.exist;",
+                  "    pm.expect(jsonData.data.email).to.equal(pm.collectionVariables.get('testEmail'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{deviceA_accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Step 3A: Login from Device B (Firefox)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login successful from Device B', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('New tokens received', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.accessToken).to.be.a('string');",
+                  "    pm.expect(jsonData.refreshToken).to.be.a('string');",
+                  "    ",
+                  "    pm.collectionVariables.set('deviceB_accessToken', jsonData.accessToken);",
+                  "    pm.collectionVariables.set('deviceB_refreshToken', jsonData.refreshToken);",
+                  "    ",
+                  "    console.log('✅ Device B logged in successfully');",
+                  "    console.log('⚠️ This should have invalidated Device A session');",
+                  "    console.log('Access Token (Device B):', jsonData.accessToken.substring(0, 50) + '...');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "User-Agent", "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/121.0" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Step 3B: Test Device A Access (Should FAIL ❌)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Device A session invalidated', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "    console.log('✅ Device A correctly REJECTED (session invalidated)');",
+                  "});",
+                  "",
+                  "pm.test('Error message indicates session invalidation', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.error).to.include('Session invalidated');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{deviceA_accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Step 3C: Test Device B Access (Should Work ✅)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Device B can access protected endpoint', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('✅ Device B access SUCCESSFUL');",
+                  "});",
+                  "",
+                  "pm.test('Profile data received', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{deviceB_accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test 2: Token Refresh with Session Validation",
+      "description": "Test that refresh tokens fail after session invalidation",
+      "item": [
+        {
+          "name": "Step 1: Login from Device A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('deviceA_accessToken', jsonData.accessToken);",
+                  "pm.collectionVariables.set('deviceA_refreshToken', jsonData.refreshToken);",
+                  "console.log('✅ Device A logged in');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Step 2: Refresh Token (Should Work ✅)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Token refresh successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('✅ Token refresh SUCCESSFUL (session still valid)');",
+                  "});",
+                  "",
+                  "pm.test('New access token received', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.accessToken).to.be.a('string');",
+                  "    pm.collectionVariables.set('deviceA_accessToken', jsonData.accessToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refreshToken\": \"{{deviceA_refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Step 3: Login from Device B (Invalidates A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('deviceB_accessToken', jsonData.accessToken);",
+                  "pm.collectionVariables.set('deviceB_refreshToken', jsonData.refreshToken);",
+                  "console.log('✅ Device B logged in');",
+                  "console.log('⚠️ Device A session should now be invalidated');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Step 4: Try Refresh with Device A Token (Should FAIL ❌)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Refresh token rejected', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "    console.log('✅ Device A refresh token correctly REJECTED');",
+                  "});",
+                  "",
+                  "pm.test('Error message present', function () {",
+                  "    const responseText = pm.response.text();",
+                  "    pm.expect(responseText).to.include('Invalid');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refreshToken\": \"{{deviceA_refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "refresh"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test 3: Logout and Session Cleanup",
+      "description": "Test that logout properly removes session from Redis",
+      "item": [
+        {
+          "name": "Step 1: Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('deviceA_accessToken', jsonData.accessToken);",
+                  "console.log('✅ Logged in successfully');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Step 2: Access Protected Endpoint (Should Work ✅)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Access successful before logout', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('✅ Access successful before logout');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{deviceA_accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Step 3: Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Logout successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    console.log('✅ Logout successful');",
+                  "});",
+                  "",
+                  "pm.test('Logout message received', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.include('Logged out');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{deviceA_accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "logout"]
+            }
+          }
+        },
+        {
+          "name": "Step 4: Try Access After Logout (Should FAIL ❌)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Access denied after logout', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "    console.log('✅ Access correctly DENIED after logout');",
+                  "});",
+                  "",
+                  "pm.test('Session invalidated error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.error).to.include('Session invalidated');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{deviceA_accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/int/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["int", "auth", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test 4: SSO Single Session (Manual)",
+      "description": "SSO testing requires actual Okta setup - these are template requests",
+      "item": [
+        {
+          "name": "Step 1: Initiate SSO Login",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sso/authorize?state=device-a-test",
+              "host": ["{{baseUrl}}"],
+              "path": ["sso", "authorize"],
+              "query": [
+                { "key": "state", "value": "device-a-test" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Step 2: SSO Callback (After Okta)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sso/callback?code=AUTH_CODE_FROM_OKTA&state=device-a-test",
+              "host": ["{{baseUrl}}"],
+              "path": ["sso", "callback"],
+              "query": [
+                { "key": "code", "value": "AUTH_CODE_FROM_OKTA" },
+                { "key": "state", "value": "device-a-test" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Step 3: Get SSO Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sso_deviceA_token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sso/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["sso", "profile"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

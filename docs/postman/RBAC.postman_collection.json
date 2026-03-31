@@ -1,0 +1,768 @@
+{
+  "info": {
+    "name": "Exchange RBAC System - New Schema (Two Tables)",
+    "description": "Postman collection for testing the new RBAC system with api_source and user_api_mapping tables",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "api_source_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "mapping_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Login - Internal User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.accessToken) {",
+                  "        pm.collectionVariables.set('jwt_token', jsonData.data.accessToken);",
+                  "        console.log('JWT Token saved:', jsonData.data.accessToken);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@exchange.com\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/internal/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "internal", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. API Source Management",
+      "item": [
+        {
+          "name": "Create API Source",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.collectionVariables.set('api_source_id', jsonData.data.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"apiPath\": \"/exchange/v1/trades\",\n  \"apiMethod\": \"GET\",\n  \"module\": \"TRADING\",\n  \"description\": \"View all trades\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/api-sources",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "api-sources"]
+            }
+          }
+        },
+        {
+          "name": "Create Bulk API Sources",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"apiSources\": [\n    {\n      \"apiPath\": \"/exchange/v1/trades\",\n      \"apiMethod\": \"POST\",\n      \"module\": \"TRADING\",\n      \"description\": \"Create a new trade\"\n    },\n    {\n      \"apiPath\": \"/exchange/v1/trades\",\n      \"apiMethod\": \"PUT\",\n      \"module\": \"TRADING\",\n      \"description\": \"Update an existing trade\"\n    },\n    {\n      \"apiPath\": \"/exchange/v1/users\",\n      \"apiMethod\": \"GET\",\n      \"module\": \"USER_MANAGEMENT\",\n      \"description\": \"View all users\"\n    },\n    {\n      \"apiPath\": \"/exchange/v1/users\",\n      \"apiMethod\": \"POST\",\n      \"module\": \"USER_MANAGEMENT\",\n      \"description\": \"Create a new user\"\n    },\n    {\n      \"apiPath\": \"/exchange/v1/reports\",\n      \"apiMethod\": \"GET\",\n      \"module\": \"REPORTING\",\n      \"description\": \"View reports\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/api-sources/bulk",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "api-sources", "bulk"]
+            }
+          }
+        },
+        {
+          "name": "Get All API Sources",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/api-sources",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "api-sources"]
+            }
+          }
+        },
+        {
+          "name": "Get API Source by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/api-sources/{{api_source_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "api-sources", "{{api_source_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get API Sources by Module",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/api-sources/module/TRADING",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "api-sources", "module", "TRADING"]
+            }
+          }
+        },
+        {
+          "name": "Get All Modules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/api-sources/modules",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "api-sources", "modules"]
+            }
+          }
+        },
+        {
+          "name": "Search API Sources",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/api-sources/search?pathPattern=trades",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "api-sources", "search"],
+              "query": [
+                {
+                  "key": "pathPattern",
+                  "value": "trades"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update API Source",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"apiPath\": \"/exchange/v1/trades\",\n  \"apiMethod\": \"GET\",\n  \"module\": \"TRADING\",\n  \"description\": \"View all trades - updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/api-sources/{{api_source_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "api-sources", "{{api_source_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete API Source",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/api-sources/{{api_source_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "api-sources", "{{api_source_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. User API Mapping Management",
+      "item": [
+        {
+          "name": "Assign API to User (Single)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.collectionVariables.set('mapping_id', jsonData.data.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{user_id}},\n  \"apiSourceId\": {{api_source_id}},\n  \"userRole\": \"ADMIN\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings"]
+            }
+          }
+        },
+        {
+          "name": "Assign APIs to User (Bulk)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{user_id}},\n  \"userRole\": \"ADMIN\",\n  \"apiSourceIds\": [1, 2, 3, 4, 5],\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/bulk",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "bulk"]
+            },
+            "description": "Assign multiple API sources to a user at once"
+          }
+        },
+        {
+          "name": "Get User's API Mappings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/user/{{user_id}}?includeInactive=false",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "user", "{{user_id}}"],
+              "query": [
+                {
+                  "key": "includeInactive",
+                  "value": "false"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User's Accessible APIs (with Details)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/user/{{user_id}}/accessible-apis",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "user", "{{user_id}}", "accessible-apis"]
+            },
+            "description": "Returns list of APIs with full details (path, method, module, description)"
+          }
+        },
+        {
+          "name": "Get Mapping by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/{{mapping_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "{{mapping_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Mappings by Role",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/role/ADMIN",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "role", "ADMIN"]
+            }
+          }
+        },
+        {
+          "name": "Get User's Module Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/user/{{user_id}}/module/TRADING",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "user", "{{user_id}}", "module", "TRADING"]
+            }
+          }
+        },
+        {
+          "name": "Get User Permission Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/user/{{user_id}}/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "user", "{{user_id}}", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Update Mapping",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{user_id}},\n  \"apiSourceId\": {{api_source_id}},\n  \"userRole\": \"ADMIN\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/{{mapping_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "{{mapping_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Toggle Mapping Status - Deactivate",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/{{mapping_id}}/status?isActive=false",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "{{mapping_id}}", "status"],
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "false"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Toggle Mapping Status - Activate",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/{{mapping_id}}/status?isActive=true",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "{{mapping_id}}", "status"],
+              "query": [
+                {
+                  "key": "isActive",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Mapping",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/{{mapping_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "{{mapping_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete All User Mappings",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/user/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "user", "{{user_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Permission Checks",
+      "item": [
+        {
+          "name": "Check User Permission - Has Access",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{user_id}},\n  \"apiPath\": \"/exchange/v1/trades\",\n  \"httpMethod\": \"GET\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/check-permission",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "check-permission"]
+            },
+            "description": "Check if user has permission to access a specific API endpoint with a specific HTTP method"
+          }
+        },
+        {
+          "name": "Check User Permission - No Access",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{user_id}},\n  \"apiPath\": \"/exchange/v1/admin/secrets\",\n  \"httpMethod\": \"DELETE\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/check-permission",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "check-permission"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Cache Management",
+      "item": [
+        {
+          "name": "Get Cache Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/cache/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "cache", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Invalidate User Cache",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/cache/user/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "cache", "user", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Clear All Cache",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/cache/clear",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "cache", "clear"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Test Protected Endpoints",
+      "item": [
+        {
+          "name": "Access Allowed Endpoint",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/trades",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "trades"]
+            },
+            "description": "Should succeed if user has GET permission on /exchange/v1/trades"
+          }
+        },
+        {
+          "name": "Access Forbidden Endpoint",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/exchange/v1/admin/secrets",
+              "host": ["{{base_url}}"],
+              "path": ["exchange", "v1", "admin", "secrets"]
+            },
+            "description": "Should return 403 Forbidden if user doesn't have DELETE permission"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Admin Workflows",
+      "item": [
+        {
+          "name": "Setup User with Full Trading Access",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{user_id}},\n  \"userRole\": \"TRADER\",\n  \"apiSourceIds\": [1, 2, 3],\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/bulk",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "bulk"]
+            },
+            "description": "Assign all trading-related APIs (GET, POST, PUT for /exchange/v1/trades)"
+          }
+        },
+        {
+          "name": "Revoke User Module Access",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/user-api-mappings/user/{{user_id}}/module/TRADING",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "user-api-mappings", "user", "{{user_id}}", "module", "TRADING"]
+            },
+            "description": "Remove all permissions for a specific module"
+          }
+        }
+      ]
+    }
+  ]
+}

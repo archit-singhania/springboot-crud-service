@@ -1,0 +1,529 @@
+# =====================================================
+# LOCAL DEVELOPMENT ENVIRONMENT CONFIGURATION
+# =====================================================
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    whitelabel:
+      enabled: true
+    path: /error
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: on-param
+    include-exception: true
+  servlet:
+    context-path: /
+    session:
+      timeout: 30m
+
+spring:
+  application:
+    name: iam-nexus
+  
+  cloud:
+    compatibility-verifier:
+      enabled: false
+
+  # ===== Database Configuration =====
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:exchange_db}?currentSchema=${DB_SCHEMA:trading_portal}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:2526}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_HIKARI_MAX_POOL_SIZE:10}
+      minimum-idle: ${DB_HIKARI_MIN_IDLE:5}
+      connection-timeout: ${DB_HIKARI_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_HIKARI_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_HIKARI_MAX_LIFETIME:1800000}
+      connection-test-query: SELECT 1
+      pool-name: ExchangeHikariPool
+
+  # ===== JPA Configuration =====
+  jpa:
+    show-sql: ${JPA_SHOW_SQL:true}
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: ${JPA_FORMAT_SQL:true}
+        default_schema: ${DB_SCHEMA:trading_portal}
+        type:
+          preferred_json_mapper: jackson
+        jdbc:
+          time_zone: UTC
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        use_sql_comments: true
+        generate_statistics: false
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+
+  # ===== SQL Initialization =====
+  sql:
+    init:
+      mode: never
+
+  # ===== Liquibase Configuration =====
+  liquibase:
+    enabled: ${LIQUIBASE_ENABLED:false}
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    default-schema: ${DB_SCHEMA:public}
+
+  # ===== MVC Configuration =====
+  mvc:
+    throw-exception-if-no-handler-found: true
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+  # ===== Web Resources Configuration =====
+  web:
+    resources:
+      add-mappings: true
+
+  # ===== Thymeleaf Configuration =====
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    cache: false
+    enabled: false
+
+  # ===== Redis Configuration =====
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT:60000}
+      database: ${REDIS_DATABASE:0}
+      lettuce:
+        pool:
+          max-active: ${REDIS_MAX_ACTIVE:10}
+          max-idle: ${REDIS_MAX_IDLE:5}
+          min-idle: ${REDIS_MIN_IDLE:2}
+          max-wait: ${REDIS_MAX_WAIT:-1}
+        shutdown-timeout: 100ms
+
+  # ===== Jackson Configuration =====
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      fail-on-empty-beans: false
+    deserialization:
+      fail-on-unknown-properties: false
+    time-zone: UTC
+    default-property-inclusion: non_null
+
+# =====================================================
+# OAuth2/Okta Configuration
+# =====================================================
+okta:
+  oauth2:
+    issuer: ${OKTA_ISSUER:https://your-okta-domain.okta.com/oauth2/default}
+    client-id: ${OKTA_CLIENT_ID:your-client-id}
+    client-secret: ${OKTA_CLIENT_SECRET:your-client-secret}
+    profile-endpoint: ${OKTA_PROFILE_ENDPOINT:https://your-okta-domain.okta.com/oauth2/default/v1/userinfo}
+    redirect-uri: ${OKTA_REDIRECT_URI:http://localhost:8080/callback}
+    scope: ${OKTA_SCOPE:openid profile email}
+    authorization-endpoint: ${OKTA_AUTHORIZATION_ENDPOINT:https://your-okta-domain.okta.com/oauth2/default/v1/authorize}
+    token-endpoint: ${OKTA_TOKEN_ENDPOINT:https://your-okta-domain.okta.com/oauth2/default/v1/token}
+    jwks-uri: ${OKTA_JWKS_URI:https://your-okta-domain.okta.com/oauth2/default/v1/keys}
+    userinfo-endpoint: ${OKTA_USERINFO_ENDPOINT:https://your-okta-domain.okta.com/oauth2/default/v1/userinfo}
+
+# =====================================================
+# Exchange Token Configuration
+# =====================================================
+exchange:
+  token:
+    issuer: ${EXCHANGE_TOKEN_ISSUER:https://iam-nexus.com}
+    expiry-minutes: ${EXCHANGE_TOKEN_EXPIRY_MINUTES:15}
+    refresh-expiry-hours: ${EXCHANGE_TOKEN_REFRESH_EXPIRY_HOURS:24}
+    audience: ${EXCHANGE_TOKEN_AUDIENCE:IAM_NEXUS}
+
+# =====================================================
+# JWT Configuration
+# =====================================================
+jwt:
+  secret: ${JWT_SECRET_KEY:default-secret-key-change-this-in-production-at-least-256-bits}
+  privatekey: ${JWT_PRIVATE_KEY:}
+  publickey: ${JWT_PUBLIC_KEY:}
+  rsaKey: ${JWT_RSA_KEY:}
+  keyId: ${JWT_KEY_ID:default-key-id}
+
+# =====================================================
+# Application Specific Configuration
+# =====================================================
+app:
+  data:
+    init:
+      enabled: ${DATA_INIT_ENABLED:false}
+  security:
+    enabled: ${SECURITY_ENABLED:true}
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:4200}
+      allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
+      allowed-headers: ${CORS_ALLOWED_HEADERS:*}
+      allow-credentials: ${CORS_ALLOW_CREDENTIALS:true}
+
+# =====================================================
+# Resilience4j Configuration
+# =====================================================
+resilience4j:
+
+  # ===== Circuit Breaker Configuration =====
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 50
+        slowCallRateThreshold: 100
+        slowCallDurationThreshold: 30s
+        eventConsumerBufferSize: 10
+        recordExceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - feign.FeignException
+          - org.springframework.web.client.ResourceAccessException
+        ignoreExceptions:
+          - com.example.demo.exception.SSOAuthenticationException
+          - com.example.demo.exception.SSOProfileValidationException
+          - java.lang.IllegalArgumentException
+
+    instances:
+      oktaTokenExchange:
+        baseConfig: default
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 50
+        slowCallRateThreshold: 100
+        slowCallDurationThreshold: 30s
+
+      oktaTokenRefresh:
+        baseConfig: default
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 50
+
+      oktaProfileFetch:
+        baseConfig: default
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        waitDurationInOpenState: 20s
+        failureRateThreshold: 60
+
+  # ===== Retry Configuration =====
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 1000ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        exponentialMaxWaitDuration: 10s
+        retryExceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+          - feign.RetryableException
+          - java.io.IOException
+          - org.springframework.web.client.ResourceAccessException
+        ignoreExceptions:
+          - com.example.demo.exception.SSOAuthenticationException
+
+    instances:
+      oktaTokenExchange:
+        baseConfig: default
+        maxAttempts: 3
+        waitDuration: 1000ms
+        exponentialBackoffMultiplier: 2
+
+      oktaTokenRefresh:
+        baseConfig: default
+        maxAttempts: 3
+        waitDuration: 1000ms
+        exponentialBackoffMultiplier: 2
+
+      oktaProfileFetch:
+        baseConfig: default
+        maxAttempts: 2
+        waitDuration: 500ms
+
+  # ===== Rate Limiter Configuration =====
+  ratelimiter:
+    configs:
+      default:
+        limitForPeriod: 100
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+        registerHealthIndicator: true
+        eventConsumerBufferSize: 100
+
+    instances:
+      oktaApi:
+        limitForPeriod: 50
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+
+  # ===== Time Limiter Configuration =====
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 30s
+        cancelRunningFuture: true
+
+    instances:
+      oktaTokenExchange:
+        timeoutDuration: 30s
+        cancelRunningFuture: true
+
+      oktaTokenRefresh:
+        timeoutDuration: 15s
+        cancelRunningFuture: true
+
+      oktaProfileFetch:
+        timeoutDuration: 10s
+        cancelRunningFuture: true
+
+  # ===== Bulkhead Configuration =====
+  bulkhead:
+    configs:
+      default:
+        maxConcurrentCalls: 25
+        maxWaitDuration: 5000ms
+
+    instances:
+      oktaApi:
+        maxConcurrentCalls: 20
+        maxWaitDuration: 3000ms
+
+# =====================================================
+# Feign Client Configuration
+# =====================================================
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 10000
+        readTimeout: 30000
+        loggerLevel: FULL
+        retryer: feign.Retryer.NEVER_RETRY
+        decode404: false
+
+      okta-token-client:
+        connectTimeout: 30000
+        readTimeout: 30000
+        loggerLevel: FULL
+        errorDecoder: com.example.demo.config.OktaErrorDecoder
+        requestInterceptors:
+          - com.example.demo.config.OktaRequestInterceptor
+        retryer: feign.Retryer.NEVER_RETRY
+
+  compression:
+    request:
+      enabled: true
+      mime-types: application/json,application/xml,text/xml
+      min-request-size: 2048
+    response:
+      enabled: true
+      useGzipDecoder: true
+
+  httpclient:
+    enabled: true
+    max-connections: 200
+    max-connections-per-route: 50
+    time-to-live: 900
+    time-to-live-unit: seconds
+    follow-redirects: true
+    connection-timeout: 30000
+    connection-timer-repeat: 3000
+
+  okhttp:
+    enabled: false
+
+# =====================================================
+# Management & Monitoring (Actuator)
+# =====================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,env,loggers,circuitbreakers,circuitbreakerevents,retries,retryevents,ratelimiters,timelimiters,bulkheads
+      base-path: /actuator
+      cors:
+        allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:4200}
+        allowed-methods: GET,POST
+
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: ping,livenessState
+        readiness:
+          include: readinessState,db,redis
+    
+    env:
+      show-values: when-authorized
+    
+    loggers:
+      enabled: true
+
+  health:
+    circuitbreakers:
+      enabled: true
+    ratelimiters:
+      enabled: true
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+    db:
+      enabled: true
+    redis:
+      enabled: true
+    diskspace:
+      enabled: true
+
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+        step: 1m
+        descriptions: true
+
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+      sla:
+        http.server.requests: 100ms,200ms,500ms,1s,2s,5s
+      minimum-expected-value:
+        http.server.requests: 10ms
+      maximum-expected-value:
+        http.server.requests: 10s
+
+    tags:
+      application: ${spring.application.name}
+      environment: local
+      version: ${APP_VERSION:1.0.0}
+
+    enable:
+      jvm: true
+      process: true
+      system: true
+      http: true
+
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+
+# =====================================================
+# Logging Configuration
+# =====================================================
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    
+    # Application packages
+    com.example.demo: DEBUG
+    com.example.demo.service: DEBUG
+    com.example.demo.controller: DEBUG
+    com.example.demo.feign: DEBUG
+    com.example.demo.config: DEBUG
+    com.example.demo.security: DEBUG
+    com.example.demo.adapter: DEBUG
+    
+    # Feign logging
+    feign: DEBUG
+    feign.Logger: DEBUG
+    
+    # Resilience4j logging
+    io.github.resilience4j: DEBUG
+    io.github.resilience4j.circuitbreaker: DEBUG
+    io.github.resilience4j.retry: DEBUG
+    
+    # Spring framework
+    org.springframework.web: INFO
+    org.springframework.web.servlet.mvc: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.security.web: DEBUG
+    org.springframework.web.reactive.function.client: DEBUG
+    org.springframework.boot.actuate: DEBUG
+    org.springframework.cloud.openfeign: DEBUG
+    
+    # Database
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.orm.jdbc.bind: TRACE
+    
+    # Connection Pool
+    com.zaxxer.hikari: DEBUG
+    
+    # Redis
+    org.springframework.data.redis: DEBUG
+
+  file:
+    name: ${LOG_FILE:logs/application.log}
+    max-size: ${LOG_FILE_MAX_SIZE:10MB}
+    max-history: ${LOG_FILE_MAX_HISTORY:7}
+    total-size-cap: ${LOG_FILE_TOTAL_SIZE:100MB}
+    
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %clr([%thread]){faint} %clr(%-5level) %clr(%logger{36}){cyan} %clr(:){faint} %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
+      total-size-cap: 100MB
+
+# =====================================================
+# Swagger/OpenAPI Configuration
+# =====================================================
+springdoc:
+  api-docs:
+    path: /api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    tags-sorter: alpha
+    operations-sorter: alpha
+    display-request-duration: true
+    filter: true
+    try-it-out-enabled: true
+    default-models-expand-depth: 1
+    default-model-expand-depth: 1
+  show-actuator: true
+  default-produces-media-type: application/json
+  default-consumes-media-type: application/json
+  writer-with-default-pretty-printer: true
+  
+  # API Info
+  info:
+    title: IAM Nexus API
+    description: Identity and Access Management API for IAM Nexus Platform
+    version: 1.0.0
+    contact:
+      name: IAM Nexus Team
+      email: support@iam-nexus.com
+    license:
+      name: Proprietary
